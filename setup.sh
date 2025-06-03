@@ -59,9 +59,33 @@ fi
 echo ""
 
 # Build secrets CLI
-echo "🔨 Building secrets management tool..."
-docker run --rm -v "$PWD":/app -w /app rust:1.82 cargo build --release -p myrss-secrets
-echo "✅ Secrets tool built"
+if [ -f "./target/release/myrss-secrets" ]; then
+    echo "🔨 Secrets tool already built, skipping..."
+else
+    echo "🔨 Building secrets management tool..."
+    echo "   (This may take a few minutes on first run)"
+    
+    # Retry logic for network issues
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if docker run --rm -v "$PWD":/app -w /app rust:1.82 cargo build --release -p myrss-secrets; then
+            echo "✅ Secrets tool built successfully"
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠️  Build failed, retrying ($RETRY_COUNT/$MAX_RETRIES)..."
+                sleep 5
+            else
+                echo "❌ Failed to build secrets tool after $MAX_RETRIES attempts"
+                echo "   This might be due to temporary network issues with crates.io"
+                echo "   Please try running the setup again in a few minutes"
+                exit 1
+            fi
+        fi
+    done
+fi
 echo ""
 
 # Initialize secrets if not already done
