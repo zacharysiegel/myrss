@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::io::{self, Read, IsTerminal};
+use std::io::{self, Read};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct EncryptedValue {
@@ -139,22 +139,22 @@ fn main() -> Result<()> {
     match cli.command {
         Commands::Add { key, value } => {
             // Check for master password in environment variable first
-            let password = match std::env::var("MYRSS_MASTER_PASSWORD") {
-                Ok(p) => p,
-                Err(_) => prompt_password("Enter master password: ")?,
+            let env_password = std::env::var("MYRSS_MASTER_PASSWORD").ok();
+            let password = match &env_password {
+                Some(p) => p.clone(),
+                None => prompt_password("Enter master password: ")?,
             };
             
             let secret_value = match value {
                 Some(v) => v,
                 None => {
-                    // Check if stdin is a terminal
-                    if io::stdin().is_terminal() {
-                        prompt_password("Enter secret value: ")?
-                    } else {
-                        // Read from stdin (piped input)
+                    // If password is from env, assume we're in automation mode and read from stdin
+                    if env_password.is_some() {
                         let mut buffer = String::new();
                         io::stdin().read_to_string(&mut buffer)?;
                         buffer.trim().to_string()
+                    } else {
+                        prompt_password("Enter secret value: ")?
                     }
                 },
             };
