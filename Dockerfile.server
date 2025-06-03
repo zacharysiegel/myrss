@@ -16,8 +16,8 @@ RUN mkdir -p myrss-secrets/src myrss-server/src myrss-auth/src && \
     echo "fn main() {}" > myrss-auth/src/main.rs && \
     echo "pub struct SecretsReader; impl SecretsReader { pub fn new<P>(_: P, _: String) -> anyhow::Result<Self> { unimplemented!() } pub fn get(&self, _: &str) -> anyhow::Result<String> { unimplemented!() } pub fn get_or_default(&self, _: &str, default: String) -> String { default } }" > myrss-secrets/src/lib.rs
 
-# Build dependencies (SQLx compile-time checks will be skipped)
-RUN DATABASE_URL="postgresql://postgres:postgres@localhost/postgres" cargo build --release -p myrss-server
+# Build dependencies
+RUN cargo build --release -p myrss-server
 
 # Copy actual source code and migrations
 COPY myrss-secrets/src ./myrss-secrets/src
@@ -26,7 +26,7 @@ COPY myrss-server/migrations ./myrss-server/migrations
 
 # Build the server
 RUN touch myrss-server/src/main.rs && \
-    DATABASE_URL="postgresql://postgres:postgres@localhost/postgres" cargo build --release -p myrss-server
+    cargo build --release -p myrss-server
 
 # Runtime stage
 FROM debian:bookworm-slim
