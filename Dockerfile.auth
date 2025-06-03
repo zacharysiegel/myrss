@@ -23,8 +23,9 @@ RUN cargo build --release -p myrss-auth
 COPY myrss-secrets/src ./myrss-secrets/src
 COPY myrss-auth/src ./myrss-auth/src
 
-# Build the auth service
-RUN touch myrss-auth/src/main.rs && \
+# Rebuild everything with real source code
+RUN touch myrss-secrets/src/lib.rs && \
+    touch myrss-auth/src/main.rs && \
     cargo build --release -p myrss-auth
 
 # Runtime stage

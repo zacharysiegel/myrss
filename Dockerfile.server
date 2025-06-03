@@ -24,8 +24,9 @@ COPY myrss-secrets/src ./myrss-secrets/src
 COPY myrss-server/src ./myrss-server/src
 COPY myrss-server/migrations ./myrss-server/migrations
 
-# Build the server
-RUN touch myrss-server/src/main.rs && \
+# Rebuild everything with real source code
+RUN touch myrss-secrets/src/lib.rs && \
+    touch myrss-server/src/main.rs && \
     cargo build --release -p myrss-server
 
 # Runtime stage
