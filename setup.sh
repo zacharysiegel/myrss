@@ -101,7 +101,7 @@ else
     SESSION_KEY=$(openssl rand -hex 32)
     echo "$SESSION_KEY" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add session_key
     
-    # Set database URL
+    # Set database URL (using 'postgres' as hostname for Docker networking)
     echo "postgresql://myrss:myrss@postgres/myrss" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add database_url
     
     # Create default admin user
