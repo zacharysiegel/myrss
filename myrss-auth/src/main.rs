@@ -103,7 +103,7 @@ async fn auth_proxy(
 
     // Forward request to backend with auth header
     let client = reqwest::Client::new();
-    let method = req.method().clone();
+    let method = req.method();
     let path = req.uri().path();
     let query = req.uri().query().unwrap_or("");
     
@@ -113,7 +113,19 @@ async fn auth_proxy(
         format!("{}{}?{}", state.backend_url, path, query)
     };
 
-    let mut backend_req = client.request(method.clone(), &url);
+    // Convert actix Method to reqwest Method
+    let req_method = match method.as_str() {
+        "GET" => reqwest::Method::GET,
+        "POST" => reqwest::Method::POST,
+        "PUT" => reqwest::Method::PUT,
+        "DELETE" => reqwest::Method::DELETE,
+        "HEAD" => reqwest::Method::HEAD,
+        "OPTIONS" => reqwest::Method::OPTIONS,
+        "PATCH" => reqwest::Method::PATCH,
+        _ => return Err(actix_web::error::ErrorBadRequest("Unsupported method")),
+    };
+
+    let mut backend_req = client.request(req_method, &url);
 
     // Copy headers except Authorization
     for (name, value) in req.headers() {
