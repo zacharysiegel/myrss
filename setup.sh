@@ -32,19 +32,30 @@ if [ ! -f "certs/myrss.crt" ] || [ ! -f "certs/myrss.key" ]; then
 fi
 
 # Set up master password
-echo "🔑 Setting up master password..."
-read -s -p "Enter master password for secrets encryption: " MASTER_PASSWORD
-echo ""
-read -s -p "Confirm master password: " MASTER_PASSWORD_CONFIRM
-echo ""
+if [ -f ".env" ]; then
+    echo "🔑 Loading existing master password..."
+    source .env
+    if [ -z "$MYRSS_MASTER_PASSWORD" ]; then
+        echo "❌ .env file exists but MYRSS_MASTER_PASSWORD is not set"
+        exit 1
+    fi
+    MASTER_PASSWORD="$MYRSS_MASTER_PASSWORD"
+    echo "✅ Master password loaded from .env"
+else
+    echo "🔑 Setting up new master password..."
+    read -s -p "Enter master password for secrets encryption: " MASTER_PASSWORD
+    echo ""
+    read -s -p "Confirm master password: " MASTER_PASSWORD_CONFIRM
+    echo ""
 
-if [ "$MASTER_PASSWORD" != "$MASTER_PASSWORD_CONFIRM" ]; then
-    echo "❌ Passwords do not match"
-    exit 1
+    if [ "$MASTER_PASSWORD" != "$MASTER_PASSWORD_CONFIRM" ]; then
+        echo "❌ Passwords do not match"
+        exit 1
+    fi
+
+    echo "export MYRSS_MASTER_PASSWORD='$MASTER_PASSWORD'" > .env
+    echo "✅ Master password saved to .env"
 fi
-
-echo "export MYRSS_MASTER_PASSWORD='$MASTER_PASSWORD'" > .env
-echo "✅ Master password set"
 echo ""
 
 # Build secrets CLI
@@ -53,33 +64,38 @@ docker run --rm -v "$PWD":/app -w /app rust:1.82 cargo build --release -p myrss-
 echo "✅ Secrets tool built"
 echo ""
 
-# Initialize secrets
-echo "🔐 Initializing secrets..."
-
-# Generate session key
-SESSION_KEY=$(openssl rand -hex 32)
-echo "$SESSION_KEY" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add session_key
-
-# Set database URL
-echo "postgresql://myrss:myrss@postgres/myrss" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add database_url
-
-# Create default admin user
-echo "📝 Creating default admin user..."
-read -p "Enter admin username (default: admin): " ADMIN_USER
-ADMIN_USER=${ADMIN_USER:-admin}
-
-read -s -p "Enter admin password: " ADMIN_PASS
-echo ""
-
-# Hash the password
-ADMIN_PASS_HASH=$(echo -n "$ADMIN_PASS" | sha256sum | cut -d' ' -f1)
-
-# Create users JSON
-USERS_JSON="[{\"username\":\"$ADMIN_USER\",\"password_hash\":\"$ADMIN_PASS_HASH\"}]"
-echo "$USERS_JSON" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add auth_users
-
-echo "✅ Secrets initialized"
-echo ""
+# Initialize secrets if not already done
+if [ -f "secrets.yaml" ]; then
+    echo "🔐 Secrets file already exists, skipping initialization..."
+    echo ""
+else
+    echo "🔐 Initializing secrets..."
+    
+    # Generate session key
+    SESSION_KEY=$(openssl rand -hex 32)
+    echo "$SESSION_KEY" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add session_key
+    
+    # Set database URL
+    echo "postgresql://myrss:myrss@postgres/myrss" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add database_url
+    
+    # Create default admin user
+    echo "📝 Creating default admin user..."
+    read -p "Enter admin username (default: admin): " ADMIN_USER
+    ADMIN_USER=${ADMIN_USER:-admin}
+    
+    read -s -p "Enter admin password: " ADMIN_PASS
+    echo ""
+    
+    # Hash the password
+    ADMIN_PASS_HASH=$(echo -n "$ADMIN_PASS" | sha256sum | cut -d' ' -f1)
+    
+    # Create users JSON
+    USERS_JSON="[{\"username\":\"$ADMIN_USER\",\"password_hash\":\"$ADMIN_PASS_HASH\"}]"
+    echo "$USERS_JSON" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add auth_users
+    
+    echo "✅ Secrets initialized"
+    echo ""
+fi
 
 # Update hosts file
 echo "📝 Updating /etc/hosts..."
