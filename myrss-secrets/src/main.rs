@@ -102,7 +102,7 @@ fn encrypt_value(value: &str, password: &str) -> Result<EncryptedValue> {
 
     let ciphertext = cipher
         .encrypt(nonce, value.as_bytes())
-        .context("Failed to encrypt value")?;
+        .map_err(|_| anyhow::anyhow!("Failed to encrypt value"))?;
 
     Ok(EncryptedValue {
         ciphertext: BASE64.encode(&ciphertext),
@@ -125,7 +125,7 @@ fn decrypt_value(encrypted: &EncryptedValue, password: &str) -> Result<String> {
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext.as_ref())
-        .context("Failed to decrypt value")?;
+        .map_err(|_| anyhow::anyhow!("Failed to decrypt value"))?;
 
     String::from_utf8(plaintext)
         .context("Failed to convert decrypted value to string")

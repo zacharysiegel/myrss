@@ -74,7 +74,7 @@ fn decrypt_value(encrypted: &EncryptedValue, password: &str) -> Result<String> {
 
     let plaintext = cipher
         .decrypt(nonce, ciphertext.as_ref())
-        .context("Failed to decrypt value")?;
+        .map_err(|_| anyhow::anyhow!("Failed to decrypt value"))?;
 
     String::from_utf8(plaintext)
         .context("Failed to convert decrypted value to string")
