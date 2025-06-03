@@ -14,7 +14,7 @@ RUN mkdir -p myrss-secrets/src myrss-server/src myrss-auth/src && \
     echo "fn main() {}" > myrss-secrets/src/main.rs && \
     echo "fn main() {}" > myrss-server/src/main.rs && \
     echo "fn main() {}" > myrss-auth/src/main.rs && \
-    echo "pub struct SecretsReader;" > myrss-secrets/src/lib.rs
+    echo "pub struct SecretsReader; impl SecretsReader { pub fn new<P>(_: P, _: String) -> anyhow::Result<Self> { unimplemented!() } pub fn get(&self, _: &str) -> anyhow::Result<String> { unimplemented!() } pub fn get_or_default(&self, _: &str, default: String) -> String { default } }" > myrss-secrets/src/lib.rs
 
 # Build dependencies
 RUN cargo build --release -p myrss-server
