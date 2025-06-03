@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function(e) {
-            this.textContent = '⏳ Refreshing...';
+            this.textContent = 'Refreshing...';
             this.style.pointerEvents = 'none';
         });
     }

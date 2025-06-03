@@ -4,14 +4,14 @@ MyRSS is a self-hosted RSS reader built with Rust, featuring a clean web interfa
 
 ## Features
 
-- 🔐 User authentication with per-user RSS subscriptions
-- 📰 Easy feed management - add feeds by URL or raw XML content
-- 🔒 Encrypted secrets storage using ChaCha20Poly1305
-- 🎨 Server-side rendered UI with Maud templates
-- 🚀 High-performance Rust backend with actix-web
-- 📦 PostgreSQL database for reliable data storage
-- 🔧 Nginx reverse proxy with HTTPS support
-- 🐳 Docker Compose deployment
+- User authentication with per-user RSS subscriptions
+- Easy feed management - add feeds by URL or raw XML content
+- Encrypted secrets storage using ChaCha20Poly1305
+- Server-side rendered UI with Maud templates
+- High-performance Rust backend with actix-web
+- PostgreSQL database for reliable data storage
+- Nginx reverse proxy with HTTPS support
+- Docker Compose deployment
 
 ## Architecture
 
