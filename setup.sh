@@ -49,7 +49,7 @@ echo ""
 
 # Build secrets CLI
 echo "🔨 Building secrets management tool..."
-docker run --rm -v "$PWD":/app -w /app rust:1.75 cargo build --release -p myrss-secrets
+docker run --rm -v "$PWD":/app -w /app rust:1.82 cargo build --release -p myrss-secrets
 echo "✅ Secrets tool built"
 echo ""
 
@@ -58,10 +58,10 @@ echo "🔐 Initializing secrets..."
 
 # Generate session key
 SESSION_KEY=$(openssl rand -hex 32)
-echo "$SESSION_KEY" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.75 ./target/release/myrss-secrets add session_key
+echo "$SESSION_KEY" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add session_key
 
 # Set database URL
-echo "postgresql://myrss:myrss@postgres/myrss" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.75 ./target/release/myrss-secrets add database_url
+echo "postgresql://myrss:myrss@postgres/myrss" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add database_url
 
 # Create default admin user
 echo "📝 Creating default admin user..."
@@ -76,7 +76,7 @@ ADMIN_PASS_HASH=$(echo -n "$ADMIN_PASS" | sha256sum | cut -d' ' -f1)
 
 # Create users JSON
 USERS_JSON="[{\"username\":\"$ADMIN_USER\",\"password_hash\":\"$ADMIN_PASS_HASH\"}]"
-echo "$USERS_JSON" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.75 ./target/release/myrss-secrets add auth_users
+echo "$USERS_JSON" | docker run --rm -i -v "$PWD":/app -w /app -e MYRSS_MASTER_PASSWORD="$MASTER_PASSWORD" rust:1.82 ./target/release/myrss-secrets add auth_users
 
 echo "✅ Secrets initialized"
 echo ""
