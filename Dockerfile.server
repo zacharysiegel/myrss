@@ -1,0 +1,53 @@
+# Build stage
+FROM rust:1.75 as builder
+
+WORKDIR /app
+
+# Copy workspace files
+COPY Cargo.toml ./
+COPY myrss-secrets/Cargo.toml ./myrss-secrets/
+COPY myrss-server/Cargo.toml ./myrss-server/
+COPY myrss-auth/Cargo.toml ./myrss-auth/
+
+# Create dummy files to cache dependencies
+RUN mkdir -p myrss-secrets/src myrss-server/src myrss-auth/src && \
+    echo "fn main() {}" > myrss-secrets/src/main.rs && \
+    echo "fn main() {}" > myrss-server/src/main.rs && \
+    echo "fn main() {}" > myrss-auth/src/main.rs && \
+    echo "pub fn dummy() {}" > myrss-secrets/src/lib.rs
+
+# Build dependencies
+RUN cargo build --release -p myrss-server
+
+# Copy actual source code
+COPY myrss-secrets/src ./myrss-secrets/src
+COPY myrss-server/src ./myrss-server/src
+
+# Build the server
+RUN touch myrss-server/src/main.rs && \
+    cargo build --release -p myrss-server
+
+# Copy migrations
+COPY myrss-server/migrations ./myrss-server/migrations
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the binary
+COPY --from=builder /app/target/release/myrss-server /app/
+
+# Copy static files and migrations
+COPY myrss-server/static ./static
+COPY --from=builder /app/myrss-server/migrations ./migrations
+
+EXPOSE 8080
+
+CMD ["./myrss-server"]

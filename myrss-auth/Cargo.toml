@@ -1,0 +1,17 @@
+[package]
+name = "myrss-auth"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+myrss-secrets = { path = "../myrss-secrets" }
+env_logger = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }

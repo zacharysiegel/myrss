@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: myrss
+      POSTGRES_PASSWORD: myrss
+      POSTGRES_DB: myrss
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myrss"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  myrss-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      MYRSS_SECRETS_FILE: /app/secrets.yaml
+      MYRSS_MASTER_PASSWORD: ${MYRSS_MASTER_PASSWORD}
+      MYRSS_HOST: 0.0.0.0
+      MYRSS_PORT: 8080
+      MYRSS_AUTH_HEADER: X-Authenticated-User
+    volumes:
+      - ./secrets.yaml:/app/secrets.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - myrss-network
+
+  myrss-auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    environment:
+      MYRSS_SECRETS_FILE: /app/secrets.yaml
+      MYRSS_MASTER_PASSWORD: ${MYRSS_MASTER_PASSWORD}
+      MYRSS_AUTH_HOST: 0.0.0.0
+      MYRSS_AUTH_PORT: 8081
+      MYRSS_BACKEND_URL: http://myrss-server:8080
+      MYRSS_AUTH_HEADER: X-Authenticated-User
+    volumes:
+      - ./secrets.yaml:/app/secrets.yaml:ro
+    networks:
+      - myrss-network
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - myrss-auth
+      - myrss-server
+    networks:
+      - myrss-network
+
+volumes:
+  postgres_data:
+
+networks:
+  myrss-network:
+    driver: bridge
