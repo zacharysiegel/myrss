@@ -50,9 +50,18 @@ sleep 10
 echo "[INFO] Checking service status..."
 docker-compose ps
 
-# Run database migrations
-echo "[INFO] Running database migrations..."
-docker-compose exec myrss-server ./myrss-server migrate
+# Check if myrss-server is running
+echo "[INFO] Checking if myrss-server is running..."
+if docker-compose ps myrss-server | grep -q "Up"; then
+    echo "[INFO] myrss-server is running"
+else
+    echo "[ERROR] myrss-server is not running. Checking logs..."
+    docker-compose logs myrss-server | tail -50
+    echo ""
+    echo "[ERROR] Deployment failed - myrss-server is not running"
+    echo "Please check the logs above for errors"
+    exit 1
+fi
 
 echo "[SUCCESS] Deployment complete!"
 echo ""
