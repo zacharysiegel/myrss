@@ -7,6 +7,8 @@ set -e
 echo "🚀 MyRSS Initial Setup"
 echo "====================="
 echo ""
+echo "This script is idempotent - it's safe to run multiple times"
+echo ""
 
 # Check dependencies
 echo "📋 Checking dependencies..."
