@@ -23,3 +23,4 @@ myrss-secrets = { path = "../myrss-secrets" }
 env_logger = "0.11"
 log = "0.4"
 config = "0.14"
+sha2 = "0.10"

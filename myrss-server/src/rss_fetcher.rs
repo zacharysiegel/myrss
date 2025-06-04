@@ -1,8 +1,7 @@
-use crate::{db, models::Item};
+use crate::{db, models::Feed};
 use anyhow::{Context, Result};
 use rss::Channel;
 use sqlx::PgPool;
-use time::OffsetDateTime;
 use uuid::Uuid;
 
 pub async fn fetch_and_parse_feed(url: &str) -> Result<Channel> {
@@ -25,8 +24,8 @@ pub async fn update_feed_items(pool: &PgPool, feed_id: Uuid, channel: &Channel) 
     db::update_feed_metadata(
         pool,
         feed_id,
-        Some(channel.title.clone()),
-        Some(channel.description.clone()),
+        &channel.title,
+        Some(&channel.description),
     )
     .await?;
 
@@ -51,21 +50,24 @@ pub async fn update_feed_items(pool: &PgPool, feed_id: Uuid, channel: &Channel) 
                     .or_else(|| time::OffsetDateTime::parse(date_str, &time::format_description::well_known::Rfc3339).ok())
             });
 
-        let item = Item {
-            id: Uuid::new_v4(),
-            feed_id,
-            guid,
-            title: rss_item.title.clone().unwrap_or_else(|| "Untitled".to_string()),
-            description: rss_item.description.clone(),
-            link: rss_item.link.clone(),
-            pub_date,
-            author: rss_item.author.clone()
-                .or_else(|| rss_item.dublin_core_ext.as_ref().and_then(|dc| dc.creators.first().cloned())),
-            content: rss_item.content.clone(),
-            created_at: OffsetDateTime::now_utc(),
-        };
+        let title = rss_item.title.clone().unwrap_or_else(|| "Untitled".to_string());
+        let description = rss_item.description.as_deref();
+        let link = rss_item.link.as_deref();
+        let author = rss_item.author.as_deref()
+            .or_else(|| rss_item.dublin_core_ext.as_ref().and_then(|dc| dc.creators.first().map(|s| s.as_str())));
+        let content = rss_item.content.as_deref();
 
-        db::create_or_update_item(pool, &item).await?;
+        db::create_or_update_item(
+            pool, 
+            feed_id, 
+            &guid, 
+            &title, 
+            description, 
+            link, 
+            pub_date, 
+            author, 
+            content
+        ).await?;
     }
 
     Ok(())
@@ -74,15 +76,30 @@ pub async fn update_feed_items(pool: &PgPool, feed_id: Uuid, channel: &Channel) 
 pub async fn fetch_all_user_feeds(pool: &PgPool, user_id: Uuid) -> Result<()> {
     let subscriptions = db::get_user_subscriptions(pool, user_id).await?;
     
-    for (_, feed) in subscriptions {
-        match fetch_and_parse_feed(&feed.url).await {
-            Ok(channel) => {
-                if let Err(e) = update_feed_items(pool, feed.id, &channel).await {
-                    log::error!("Failed to update feed {}: {}", feed.url, e);
+    // Get feed URLs for all subscriptions
+    let feed_ids: Vec<Uuid> = subscriptions.iter().map(|s| s.feed_id).collect();
+    
+    // Fetch all feeds
+    for feed_id in feed_ids {
+        // Get feed info
+        let feed_result: Result<Feed> = sqlx::query_as::<_, Feed>(
+            "SELECT id, url, title, description, last_fetched, created_at, updated_at FROM feeds WHERE id = $1"
+        )
+        .bind(feed_id)
+        .fetch_one(pool)
+        .await
+        .map_err(Into::into);
+        
+        if let Ok(feed) = feed_result {
+            match fetch_and_parse_feed(&feed.url).await {
+                Ok(channel) => {
+                    if let Err(e) = update_feed_items(pool, feed.id, &channel).await {
+                        log::error!("Failed to update feed {}: {}", feed.url, e);
+                    }
                 }
-            }
-            Err(e) => {
-                log::error!("Failed to fetch feed {}: {}", feed.url, e);
+                Err(e) => {
+                    log::error!("Failed to fetch feed {}: {}", feed.url, e);
+                }
             }
         }
     }

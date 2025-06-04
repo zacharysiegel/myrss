@@ -4,7 +4,7 @@ use chacha20poly1305::{
     aead::{Aead, KeyInit, OsRng},
     ChaCha20Poly1305, Nonce,
 };
-use clap::{Parser, Subcommand};
+use clap::{Arg, Command};
 use rand::RngCore;
 use rpassword::prompt_password;
 use serde::{Deserialize, Serialize};
@@ -49,36 +49,6 @@ impl SecretsStore {
             .context("Failed to write secrets file")?;
         Ok(())
     }
-}
-
-#[derive(Parser)]
-#[command(name = "myrss-secrets")]
-#[command(about = "Manage encrypted secrets for myrss", long_about = None)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-
-    #[arg(short, long, default_value = "secrets.yaml")]
-    file: PathBuf,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Add {
-        #[arg(help = "Key name for the secret")]
-        key: String,
-        #[arg(help = "Secret value (will prompt if not provided)")]
-        value: Option<String>,
-    },
-    Get {
-        #[arg(help = "Key name to retrieve")]
-        key: String,
-    },
-    List,
-    Remove {
-        #[arg(help = "Key name to remove")]
-        key: String,
-    },
 }
 
 fn derive_key_from_password(password: &str) -> [u8; 32] {
@@ -133,11 +103,66 @@ fn decrypt_value(encrypted: &EncryptedValue, password: &str) -> Result<String> {
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let mut store = SecretsStore::load(&cli.file)?;
+    let app = Command::new("myrss-secrets")
+        .about("Manage encrypted secrets for myrss")
+        .arg(
+            Arg::new("file")
+                .short('f')
+                .long("file")
+                .value_name("FILE")
+                .default_value("secrets.yaml")
+                .help("Path to the secrets file")
+        )
+        .subcommand_required(true)
+        .subcommand(
+            Command::new("add")
+                .about("Add a new secret")
+                .arg(
+                    Arg::new("key")
+                        .help("Key name for the secret")
+                        .required(true)
+                        .index(1)
+                )
+                .arg(
+                    Arg::new("value")
+                        .help("Secret value (will prompt if not provided)")
+                        .index(2)
+                )
+        )
+        .subcommand(
+            Command::new("get")
+                .about("Get a secret value")
+                .arg(
+                    Arg::new("key")
+                        .help("Key name to retrieve")
+                        .required(true)
+                        .index(1)
+                )
+        )
+        .subcommand(
+            Command::new("list")
+                .about("List all secret keys")
+        )
+        .subcommand(
+            Command::new("remove")
+                .about("Remove a secret")
+                .arg(
+                    Arg::new("key")
+                        .help("Key name to remove")
+                        .required(true)
+                        .index(1)
+                )
+        );
 
-    match cli.command {
-        Commands::Add { key, value } => {
+    let matches = app.get_matches();
+    let file = PathBuf::from(matches.get_one::<String>("file").unwrap());
+    let mut store = SecretsStore::load(&file)?;
+
+    match matches.subcommand() {
+        Some(("add", sub_matches)) => {
+            let key = sub_matches.get_one::<String>("key").unwrap().clone();
+            let value = sub_matches.get_one::<String>("value").map(|s| s.clone());
+            
             // Check for master password in environment variable first
             let env_password = std::env::var("MYRSS_MASTER_PASSWORD").ok();
             let password = match &env_password {
@@ -161,17 +186,19 @@ fn main() -> Result<()> {
 
             let encrypted = encrypt_value(&secret_value, &password)?;
             store.secrets.insert(key.clone(), encrypted);
-            store.save(&cli.file)?;
+            store.save(&file)?;
             println!("Secret '{}' added successfully", key);
         }
-        Commands::Get { key } => {
+        Some(("get", sub_matches)) => {
+            let key = sub_matches.get_one::<String>("key").unwrap();
+            
             // Check for master password in environment variable first
             let password = match std::env::var("MYRSS_MASTER_PASSWORD") {
                 Ok(p) => p,
                 Err(_) => prompt_password("Enter master password: ")?,
             };
             
-            match store.secrets.get(&key) {
+            match store.secrets.get(key) {
                 Some(encrypted) => {
                     let value = decrypt_value(encrypted, &password)?;
                     println!("{}", value);
@@ -182,21 +209,23 @@ fn main() -> Result<()> {
                 }
             }
         }
-        Commands::List => {
+        Some(("list", _)) => {
             println!("Stored secrets:");
             for key in store.secrets.keys() {
                 println!("  - {}", key);
             }
         }
-        Commands::Remove { key } => {
-            if store.secrets.remove(&key).is_some() {
-                store.save(&cli.file)?;
+        Some(("remove", sub_matches)) => {
+            let key = sub_matches.get_one::<String>("key").unwrap();
+            if store.secrets.remove(key).is_some() {
+                store.save(&file)?;
                 println!("Secret '{}' removed successfully", key);
             } else {
                 eprintln!("Secret '{}' not found", key);
                 std::process::exit(1);
             }
         }
+        _ => unreachable!("Subcommand required"),
     }
 
     Ok(())

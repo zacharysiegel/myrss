@@ -8,6 +8,8 @@ pub struct User {
     pub id: Uuid,
     pub username: String,
     pub email: String,
+    #[serde(skip)]
+    pub password_hash: String,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
@@ -34,9 +36,27 @@ pub struct Subscription {
     pub user_id: Uuid,
     pub feed_id: Uuid,
     pub custom_title: Option<String>,
-    pub folder: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Label {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    pub color: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubscriptionWithLabels {
+    #[serde(flatten)]
+    pub subscription: Subscription,
+    pub feed_title: Option<String>,
+    pub feed_url: String,
+    pub labels: Vec<Label>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -67,7 +87,12 @@ pub struct ItemWithReadStatus {
 pub struct AddFeedRequest {
     pub url: Option<String>,
     pub content: Option<String>,
-    pub folder: Option<String>,
+    pub labels: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateFeedLabelsRequest {
+    pub labels: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]

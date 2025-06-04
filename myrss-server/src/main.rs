@@ -1,3 +1,4 @@
+mod auth;
 mod config;
 mod db;
 mod handlers;
@@ -50,7 +51,10 @@ async fn main() -> Result<()> {
             .wrap(Logger::default())
             .wrap(
                 SessionMiddleware::builder(CookieSessionStore::default(), session_key)
-                    .cookie_secure(false) // Set to true in production with HTTPS
+                    .cookie_secure(false)
+                    .cookie_http_only(true)
+                    .cookie_same_site(actix_web::cookie::SameSite::Lax)
+                    .cookie_path("/".to_string())
                     .build()
             )
             .service(Files::new("/static", "./static").show_files_listing())

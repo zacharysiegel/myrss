@@ -1,12 +1,10 @@
-// Mark items as read functionality
+// Mark items as read
 document.addEventListener('DOMContentLoaded', function() {
     // Handle mark as read buttons
-    const markReadButtons = document.querySelectorAll('.mark-read');
-    
-    markReadButtons.forEach(button => {
+    document.querySelectorAll('.mark-read-btn').forEach(button => {
         button.addEventListener('click', async function() {
-            const itemId = this.getAttribute('data-item-id');
-            const article = this.closest('.item');
+            const itemId = this.dataset.itemId;
+            const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
             
             try {
                 const response = await fetch('/api/items/mark-read', {
@@ -20,93 +18,108 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 
                 if (response.ok) {
-                    article.classList.add('read');
+                    itemElement.classList.add('read');
                     this.remove();
-                } else {
-                    console.error('Failed to mark item as read');
                 }
             } catch (error) {
-                console.error('Error marking item as read:', error);
+                console.error('Failed to mark item as read:', error);
             }
         });
     });
     
-    // Auto-mark items as read when clicking on links
-    const itemLinks = document.querySelectorAll('.item-title a');
-    
-    itemLinks.forEach(link => {
-        link.addEventListener('click', async function() {
-            const article = this.closest('.item');
-            const itemId = article.getAttribute('data-item-id');
+    // Handle edit labels buttons
+    document.querySelectorAll('.edit-labels-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const subscriptionId = this.dataset.subscriptionId;
+            const modal = document.getElementById('label-edit-modal');
+            const form = document.getElementById('label-edit-form');
             
-            if (!article.classList.contains('read')) {
-                try {
-                    await fetch('/api/items/mark-read', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            item_ids: [itemId]
-                        })
-                    });
-                    
-                    article.classList.add('read');
-                    const markReadBtn = article.querySelector('.mark-read');
-                    if (markReadBtn) {
-                        markReadBtn.remove();
-                    }
-                } catch (error) {
-                    console.error('Error marking item as read:', error);
+            // Set form action
+            form.action = `/feeds/${subscriptionId}/labels`;
+            
+            // Get current labels for this subscription
+            const subscriptionItem = this.closest('.subscription-item');
+            const currentLabels = Array.from(subscriptionItem.querySelectorAll('.labels .label'))
+                .map(label => label.textContent.trim());
+            
+            // Check the appropriate checkboxes
+            form.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = currentLabels.includes(checkbox.value);
+            });
+            
+            // Show modal
+            modal.style.display = 'flex';
+        });
+    });
+    
+    // Handle form submission for label editing
+    const labelEditForm = document.getElementById('label-edit-form');
+    if (labelEditForm) {
+        labelEditForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const selectedLabels = Array.from(formData.getAll('labels'));
+            
+            // Add new labels from the text input
+            const newLabelsInput = document.getElementById('new-labels');
+            if (newLabelsInput && newLabelsInput.value) {
+                const newLabels = newLabelsInput.value.split(',').map(label => label.trim()).filter(label => label);
+                selectedLabels.push(...newLabels);
+            }
+            
+            // Create a new form data with the combined labels
+            const submitData = new FormData();
+            selectedLabels.forEach(label => submitData.append('labels', label));
+            
+            // Submit the form
+            fetch(this.action, {
+                method: 'POST',
+                body: submitData
+            }).then(response => {
+                if (response.ok) {
+                    window.location.reload();
                 }
-            }
-        });
-    });
-    
-    // Form validation
-    const addFeedForm = document.querySelector('.add-feed-form');
-    
-    if (addFeedForm) {
-        addFeedForm.addEventListener('submit', function(e) {
-            const urlInput = this.querySelector('#url');
-            const contentInput = this.querySelector('#content');
-            
-            if (!urlInput.value.trim() && !contentInput.value.trim()) {
-                e.preventDefault();
-                alert('Please provide either a feed URL or RSS content');
-            }
+            });
         });
     }
     
-    // Refresh button indicator
-    const refreshBtn = document.querySelector('.refresh-btn');
-    
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', function(e) {
-            this.textContent = 'Refreshing...';
-            this.style.pointerEvents = 'none';
+    // Handle labels field in add feed form
+    const addFeedForm = document.querySelector('.add-feed-form');
+    if (addFeedForm) {
+        addFeedForm.addEventListener('submit', function(e) {
+            const labelsInput = this.querySelector('input[name="labels"]');
+            if (labelsInput && labelsInput.value) {
+                const labels = labelsInput.value.split(',').map(label => label.trim()).filter(label => label);
+                
+                // Clear the original input
+                labelsInput.removeAttribute('name');
+                
+                // Add hidden inputs for each label
+                labels.forEach(label => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'labels';
+                    input.value = label;
+                    this.appendChild(input);
+                });
+            }
         });
     }
 });
 
-// Helper function for formatting relative dates
-function formatRelativeDate(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now - date;
-    
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-    
-    return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-    });
+// Close modal function
+function closeModal() {
+    const modal = document.getElementById('label-edit-modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    const modal = document.getElementById('label-edit-modal');
+    if (e.target === modal) {
+        closeModal();
+    }
+});
